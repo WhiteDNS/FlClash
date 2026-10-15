@@ -13,6 +13,7 @@ import (
 	"github.com/metacubex/mihomo/common/batch"
 	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/resolver"
+	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
@@ -234,22 +235,35 @@ func updateConfig(params *UpdateParams) {
 		general.Tun.Stack = *params.Tun.Stack
 	}
 
+	if params.GeoAutoUpdate != nil {
+		updater.SetGeoAutoUpdate(*params.GeoAutoUpdate)
+	}
+	if params.GeoUpdateInterval != nil {
+		updater.SetGeoUpdateInterval(*params.GeoUpdateInterval)
+	}
+
 	updateListeners()
+	if updater.GeoAutoUpdate() {
+		updater.RegisterGeoUpdaterWithCancel()
+	}
 }
 
 func applyConfig(params *SetupParams) error {
 	runtime.GC()
 	runLock.Lock()
 	defer runLock.Unlock()
-	var err error
-	constant.DefaultTestURL = params.TestURL
-	currentConfig, err = executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
+	nextConfig, err := executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
 	if err != nil {
-		currentConfig, _ = config.ParseRawConfig(config.DefaultRawConfig())
+		return err
 	}
+	constant.DefaultTestURL = params.TestURL
+	currentConfig = nextConfig
 	hub.ApplyConfig(currentConfig)
 	patchSelectGroup(params.SelectedMap)
 	updateListeners()
+	if updater.GeoAutoUpdate() {
+		updater.RegisterGeoUpdaterWithCancel()
+	}
 	return err
 }
 
