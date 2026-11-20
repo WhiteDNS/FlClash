@@ -13,6 +13,7 @@ import (
 	t "core/tun"
 	"encoding/json"
 	"errors"
+	"github.com/metacubex/mihomo/adapter/outbound"
 	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/process"
 	"github.com/metacubex/mihomo/constant"
@@ -46,6 +47,10 @@ func (th *TunHandler) start(fd int, stack, address, dns string) {
 	if tunListener != nil {
 		log.Infoln("TUN address: %v", tunListener.Address())
 		th.listener = tunListener
+		// Sockets opened before this point (e.g. WireGuard during the app's health check) are not
+		// protected from the VPN and would loop through it; reopen them now that protect works.
+		// Async: the reopened sockets call handleProtect, which waits for this start to release the limit.
+		go outbound.RebindWireGuardOutbounds()
 		return
 	}
 	th.clear()
